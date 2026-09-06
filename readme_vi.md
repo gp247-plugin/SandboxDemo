@@ -52,6 +52,7 @@ Nắm rõ luật chơi để không bất ngờ khi thấy thông báo chặn:
 **Khi nào chế độ demo có hiệu lực?**
 - **Phải bật công tắc** `SANDBOX_DEMO_ENABLED=1` trong `.env` — nếu `=0` hoặc không có, plugin không chặn gì (dù đã Enable trong admin).
 - **Phải có người đăng nhập** admin / đối tác PMO / vendor — vì thế thao tác **đăng nhập** và các trang trước khi đăng nhập vẫn chạy bình thường (không bị chặn nhầm).
+- **Chỉ áp cho bề mặt admin và API-tới-admin.** Toàn bộ **storefront** (trang sản phẩm, danh mục, giỏ hàng…) luôn chạy bình thường — kể cả khi admin đang đăng nhập cùng trình duyệt. Danh sách prefix admin khai trong `admin_surface_prefixes` (`config.php`), tự thêm prefix admin của site và của plugin vendor/PMO khi cài.
 
 **Thao tác nào bị chặn (khi demo có hiệu lực)?**
 - **Mọi thao tác ghi dữ liệu**: thêm, sửa, xóa bản ghi ở bất kỳ màn nào — vì mục tiêu là giữ nguyên dữ liệu demo.
@@ -111,4 +112,4 @@ Nắm rõ luật chơi để không bất ngờ khi thấy thông báo chặn:
 
 ---
 
-<sub>📅 **Cập nhật lần cuối:** 2026-09-06 · ✍️ **Tác giả (Author):** GP247</sub>
+<sub>📅 **Cập nhật lần cuối:** 2026-09-07 · ✍️ **Tác giả (Author):** GP247</sub>
