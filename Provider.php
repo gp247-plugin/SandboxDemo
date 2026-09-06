@@ -21,6 +21,12 @@
          require_once __DIR__.'/function.php';
      }
 
+     // Layer A (ADR sandbox-demo_write-guard-layer): a single DB choke point that
+     // blocks every data-changing statement while demo mode is active — catches
+     // Livewire, controller and query-builder writes alike (transport-agnostic on v3).
+     \Illuminate\Support\Facades\DB::beforeExecuting(function ($query, $bindings, $connection) {
+         \App\GP247\Plugins\SandboxDemo\Support\SandboxGuard::inspect($query);
+     });
 
      app('router')->aliasMiddleware('sandbox-demo', \App\GP247\Plugins\SandboxDemo\Middleware\SandBoxMiddleware::class);
 

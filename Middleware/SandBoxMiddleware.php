@@ -2,130 +2,83 @@
 
 namespace App\GP247\Plugins\SandboxDemo\Middleware;
 
-use GP247\Core\Permission;
+use App\GP247\Plugins\SandboxDemo\Support\SandboxGuard;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
+/**
+ * Layer B of the sandbox guard (ADR sandbox-demo_write-guard-layer): blocks
+ * destructive Laravel File Manager operations by route name while demo mode is
+ * active. Many LFM mutations (delete, rename, move, resize, crop, new folder) run as
+ * GET, so the DB-level guard (Layer A) cannot see them — they touch the filesystem,
+ * not the database. Reads (browse/list/download) always pass.
+ *
+ * @aidlc-unit sandbox-demo-plugin
+ * @aidlc-story US-sandbox-demo-block-lfm-destructive
+ * @aidlc-adr sandbox-demo_write-guard-layer
+ */
 class SandBoxMiddleware
 {
     /**
-     * Handle an incoming request.
+     * Handle an incoming request, blocking destructive LFM routes while sandboxed.
      *
-     * @param \Illuminate\Http\Request $request
-     * @param \Closure                 $next
-     * @param array                    $args
+     * @param Request  $request Current request.
+     * @param \Closure $next    Next pipeline stage.
+     * @param mixed    ...$args Unused middleware arguments.
+     * @return mixed Response.
      *
-     * @return mixed
+     * @aidlc-unit sandbox-demo-plugin
+     * @aidlc-story US-sandbox-demo-block-lfm-destructive
      */
     public function handle(Request $request, \Closure $next, ...$args)
     {
-        if ($this->conditionMiddleware() && config('Plugins/SandboxDemo.SANDBOX_DEMO_ENABLED')
-            && !collect($this->routeAlwaysAllow())->contains($request->route()->getName())
-            && !collect($this->pathAlwaysAllow())->contains($request->path())
+        if (SandboxGuard::isActive()
+            && $request->route()
+            && self::isDestructiveRouteName($request->route()->getName())
         ) {
-            if ($request->method() == 'GET'
-                && !collect($this->pathAlwaysBlock())->contains($request->path())
-                && !collect($this->routeAlwaysBlock())->contains($request->route()->getName())
-            ) {
-                return $next($request);
-            } else {
-                if (request()->ajax()) {
-                    $uriCurrent = request()->fullUrl();
-                    $methodCurrent = request()->method();
-                    return response()->json([
-                        'error' => '1',
-                        'msg' => 'Access denied for sandbox demo',
-                        'detail' => [
-                            'method' => $methodCurrent,
-                            'url' => $uriCurrent
-                            ]
-                    ]);
-                }
-                abort(403, 'Access denied for sandbox demo');
+            $message = self::message();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'error' => 1,
+                    'msg' => $message,
+                    'detail' => ['method' => $request->method(), 'url' => $request->fullUrl()],
+                ]);
             }
+
+            abort(403, $message);
         }
+
         return $next($request);
     }
 
-
-    private function routeAlwaysBlock()
+    /**
+     * Whether a route name is a destructive LFM operation configured for blocking.
+     *
+     * @param string|null $name Route name (e.g. "unisharp.lfm.getDelete"); null is never destructive.
+     * @return bool True when the route mutates files and must be blocked.
+     *
+     * @aidlc-unit sandbox-demo-plugin
+     * @aidlc-story US-sandbox-demo-block-lfm-destructive
+     */
+    public static function isDestructiveRouteName(?string $name): bool
     {
-        return [
-            // Array item in here
-        ];
-    }
+        if ($name === null) {
+            return false;
+        }
 
-    private function routeAlwaysAllow()
-    {
-        return [
-            // Array item in here
-        ];
+        return in_array($name, (array) config('Plugins/SandboxDemo.lfm_destructive_routes', []), true);
     }
 
     /**
-     * Path always block
+     * Localized "file changes disabled" notice with an English fallback.
      *
-     * @return  [type]  [return description]
+     * @return string Human-readable demo-mode notice.
      */
-    private function pathAlwaysBlock()
+    private static function message(): string
     {
-        $paths = [];
-        //MULTIVENDOR_ADMIN_PATH
+        $key = 'Plugins/SandboxDemo::lang.lfm_blocked';
+        $message = trans($key);
 
-        if (defined('GP247_ADMIN_PREFIX')) {
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/delete';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/newfolder';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/domove';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/rename';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/resize';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/doresize';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/cropimage';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/crop';
-            $paths[] = GP247_ADMIN_PREFIX . '/uploads/move';
-        }
-        if (config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH')) {
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/delete';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/newfolder';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/domove';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/rename';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/resize';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/doresize';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/cropimage';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/crop';
-            $paths[] = config('Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH') . '/uploads/move';
-        }
-
-        
-        if (config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH')) {
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/delete';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/newfolder';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/domove';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/rename';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/resize';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/doresize';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/cropimage';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/crop';
-            $paths[] = config('Plugins/PmoPartner.route.PARTNER_ADMIN_PATH') . '/uploads/move';
-        }
-        return $paths;
-    }
-
-    private function pathAlwaysAllow()
-    {
-        return [
-            // Array item in here
-        ];
-    }
-
-
-    private function conditionMiddleware()
-    {
-        return 
-        // Core admin login
-        (function_exists('admin') && admin()->user())
-        // Pmo partner login
-        || (function_exists('pmo_partner') && pmo_partner()->user())
-        // Vendor login
-        || (function_exists('vendor') && vendor()->user());
+        return $message === $key ? 'Demo mode: file changes are disabled.' : $message;
     }
 }

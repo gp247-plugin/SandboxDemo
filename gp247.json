@@ -7,8 +7,9 @@
     "configGroup": "Plugins",
     "configCode": "SandboxDemo",
     "configKey": "SandboxDemo",
-    "version": "1.0.2",
-    "requireCore": ["1.2"],
-    "requirePackages": [],
-    "requireExtensions": []
+    "version": "2.0.0",
+    "requireCore": ["3.0"],
+    "requireUpdateFrom": "2.0",
+    "requireComposerPackages": [],
+    "requireGp247Extensions": []
 }
