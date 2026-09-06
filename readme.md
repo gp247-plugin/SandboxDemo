@@ -52,7 +52,7 @@ Understand the rules so a blocking notice never surprises you:
 **When is demo mode in effect?**
 - **The switch must be on**: `SANDBOX_DEMO_ENABLED=1` in `.env` — if `=0` or missing, the plugin blocks nothing (even if Enabled in the admin).
 - **Someone must be logged in** as admin / PMO partner / vendor — so **logging in** and any pre-login pages keep working (never wrongly blocked).
-- **Only the admin and admin-API surfaces are affected.** The entire **storefront** (product, category, cart pages…) always works normally — even when an admin is logged in the same browser. The admin prefixes are declared in `admin_surface_prefixes` (`config.php`); the site's admin prefix and any installed vendor/PMO backend prefixes are added automatically.
+- **Only the admin and admin-API (`api/core`) surfaces are affected.** The entire **storefront** always works normally — even when an admin is logged in the same browser — including customer **account registration, login, add-to-cart, and checkout/order placement**. The customer REST API (`api/front/*`) is not blocked either. The admin prefixes are declared in `admin_surface_prefixes` (`config.php`); the site's admin prefix and any installed vendor/PMO backend prefixes are added automatically.
 
 **Which actions are blocked (while in effect)?**
 - **Every data write**: add, edit, delete records on any screen — because the goal is to keep the demo data intact.

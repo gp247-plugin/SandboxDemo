@@ -7,7 +7,7 @@
     "configGroup": "Plugins",
     "configCode": "Security",
     "configKey": "SandboxDemo",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "requireCore": ["3.0"],
     "requireUpdateFrom": "2.0",
     "requireComposerPackages": [],

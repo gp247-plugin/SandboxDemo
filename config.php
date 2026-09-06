@@ -8,7 +8,7 @@ return [
     // vendor/partner backend prefixes are added automatically at runtime.
     'admin_surface_prefixes' => [
         'gp247_admin', // admin panel
-        'api',         // API to admin (api.extend route group)
+        'api/core',    // API to admin/core only — NOT api/front/* (customer REST API)
     ],
 
     // Infrastructure tables (prefix stripped) always writable even while sandboxed,
