@@ -40,6 +40,27 @@ So the system keeps working while "viewing" (login, session, cache), a few **inf
 
 **Disabling demo mode:** set `SANDBOX_DEMO_ENABLED=0` (or remove the line), then run `php artisan optimize:clear` again. Setting `=0` disables blocking **even if** the plugin is still Enabled in the admin.
 
+### Install from the command line (CLI, gp247 3.x)
+
+Since gp247 3.x you can download **SandboxDemo** from the GP247 library and install it straight from the command line, without opening the admin. Open a terminal in the website's root folder and run:
+
+```bash
+# 1) Once per website: register the (free) API License that connects the site to the GP247 library
+php artisan gp247:ext-register-license
+
+# 2) Download the plugin from the library and install it
+php artisan gp247:ext-install --type=plugin --key=SandboxDemo
+```
+
+- Before step 1, make sure `APP_URL` in `.env` is the website's **real domain** (not `http://localhost`) — the license is bound to that domain.
+- Once installed, the plugin is **enabled** and caches are refreshed automatically; nothing else is needed in the admin.
+- The command checks the requirements declared in `gp247.json` (core version, composer packages, required plugins) and stops with a clear message if something is missing.
+- If the folder `app/GP247/Plugins/SandboxDemo` is already on the server (copied manually or shipped with the installer), the command **installs it in place** instead of downloading it again.
+- The command refuses a plugin that is already installed. To move to a newer version, run `php artisan gp247:ext-update --type=plugin --key=SandboxDemo`.
+- Append `--json` to get machine-readable output (for scripts/CI).
+- The command replaces steps 1–3 above (placing the folder, **Install**, **Enable**). **After a CLI install, demo mode is still OFF**: you still need step 4 (add `SANDBOX_DEMO_ENABLED=1` to `.env`) and step 5 (`php artisan optimize:clear`) before writes are blocked.
+- More: [Installing Plugins & Templates](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension.md) · [Command reference](https://github.com/gp247net/gp247-docs/blob/main/system/command-line-reference.md).
+
 ## 4. Customization (for developers)
 Every list is declared in `app/GP247/Plugins/SandboxDemo/config.php` — edit it there, **no** core code changes needed:
 
@@ -112,4 +133,4 @@ Understand the rules so a blocking notice never surprises you:
 
 ---
 
-<sub>📅 **Last updated:** 2026-09-07 · ✍️ **Author:** GP247</sub>
+<sub>📅 **Last updated:** 2026-09-25 · ✍️ **Author:** GP247</sub>

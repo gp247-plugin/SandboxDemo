@@ -40,6 +40,27 @@ GP247 v3 chạy giao diện admin bằng **Livewire** — mọi nút bấm (kể
 
 **Tắt chế độ demo:** đổi lại thành `SANDBOX_DEMO_ENABLED=0` (hoặc xóa dòng đó) rồi chạy lại `php artisan optimize:clear`. Đặt `=0` sẽ tắt chặn **ngay cả khi** plugin vẫn đang Enable trong admin.
 
+### Cài bằng dòng lệnh (CLI, gp247 3.x)
+
+Từ gp247 3.x, bạn có thể tải **SandboxDemo** từ thư viện GP247 và cài ngay bằng dòng lệnh mà không cần mở admin. Mở Terminal tại thư mục gốc website rồi chạy:
+
+```bash
+# 1) Chỉ làm 1 lần cho mỗi website: đăng ký API License (miễn phí) để kết nối thư viện GP247
+php artisan gp247:ext-register-license
+
+# 2) Tải plugin từ thư viện và cài
+php artisan gp247:ext-install --type=plugin --key=SandboxDemo
+```
+
+- Trước bước 1, kiểm tra `APP_URL` trong `.env` là **domain thật** của website (không để `http://localhost`), vì license được gắn với domain này.
+- Cài xong, plugin được **bật sẵn** và cache tự làm mới, bạn không cần thao tác gì thêm trong admin.
+- Lệnh tự kiểm tra điều kiện khai báo trong `gp247.json` (phiên bản core, gói composer, plugin phụ thuộc). Nếu thiếu, lệnh dừng lại và báo rõ thiếu gì.
+- Nếu thư mục `app/GP247/Plugins/SandboxDemo` đã có sẵn trên máy (chép thủ công hoặc có sẵn theo bộ cài), lệnh sẽ **cài tại chỗ**, không tải lại.
+- Nếu plugin đã được cài, lệnh sẽ từ chối. Để lên bản mới, chạy `php artisan gp247:ext-update --type=plugin --key=SandboxDemo`.
+- Thêm `--json` vào cuối lệnh để nhận kết quả dạng máy đọc được (dùng cho script/CI).
+- Lệnh thay cho các bước 1–3 ở trên (đặt thư mục, **Install**, **Enable**). **Cài xong bằng CLI, chế độ demo vẫn đang TẮT**: bạn vẫn phải làm bước 4 (thêm `SANDBOX_DEMO_ENABLED=1` vào `.env`) và bước 5 (`php artisan optimize:clear`) thì việc chặn ghi mới có hiệu lực.
+- Chi tiết: [Hướng dẫn cài đặt Plugin & Template](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension_vi.md) · [Tra cứu lệnh](https://github.com/gp247net/gp247-docs/blob/main/system/command-line-reference_vi.md).
+
 ## 4. Tùy chỉnh (dành cho lập trình viên)
 Mọi danh sách đều khai trong file `app/GP247/Plugins/SandboxDemo/config.php` — sửa ở đây, **không cần** đụng vào mã lõi:
 
@@ -112,4 +133,4 @@ Nắm rõ luật chơi để không bất ngờ khi thấy thông báo chặn:
 
 ---
 
-<sub>📅 **Cập nhật lần cuối:** 2026-09-07 · ✍️ **Tác giả (Author):** GP247</sub>
+<sub>📅 **Cập nhật lần cuối:** 2026-09-25 · ✍️ **Tác giả (Author):** GP247</sub>

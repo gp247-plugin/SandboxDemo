@@ -352,7 +352,16 @@ class SandboxGuard
 
         // Optional sibling backends (multi-vendor, PMO partner) declare their own
         // admin path; include them when those extensions are installed.
-        foreach (['Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH', 'Plugins/PmoPartner.route.PARTNER_ADMIN_PATH'] as $configKey) {
+        // WHY both MultiVendor keys: the plugin was renamed from MultiVendorPro and its
+        // config moved to Plugins/MultiVendor. Reading only the old key left
+        // /vendor_admin unguarded — a demo vendor could save everything. The old key
+        // stays for sites still running the pre-rename plugin.
+        $backendPathKeys = [
+            'Plugins/MultiVendor.route.MULTIVENDOR_ADMIN_PATH',
+            'Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH',
+            'Plugins/PmoPartner.route.PARTNER_ADMIN_PATH',
+        ];
+        foreach ($backendPathKeys as $configKey) {
             $value = config($configKey);
             if (is_string($value) && $value !== '') {
                 $prefixes[] = $value;
