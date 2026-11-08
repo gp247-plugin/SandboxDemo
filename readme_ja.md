@@ -59,7 +59,7 @@ php artisan gp247:ext-install --type=plugin --key=SandboxDemo
 - プラグインが既にインストールされている場合、コマンドは拒否します。新しいバージョンにするには `php artisan gp247:ext-update --type=plugin --key=SandboxDemo` を実行します。
 - コマンドの末尾に `--json` を付けると、機械で読める形式の結果を受け取れます（スクリプト / CI 用）。
 - このコマンドは上記の手順1〜3（フォルダーの配置、「**Install**」、「**Enable**」）の代わりになります。**CLI でインストールした直後は、デモモードはまだオフです**：書き込みのブロックを有効にするには、手順4（`.env` に `SANDBOX_DEMO_ENABLED=1` を追加）と手順5（`php artisan optimize:clear`）を行う必要があります。
-- 詳細：[プラグインとテンプレートのインストールガイド](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension.md) · [コマンドリファレンス](https://github.com/gp247net/gp247-docs/blob/main/system/command-line-reference.md)。
+- 詳細：[プラグインとテンプレートのインストールガイド](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension.md) · [コマンドリファレンス](https://github.com/gp247net/gp247-docs/blob/main/cli/cli-extensions_ja.md)。
 
 ## 4. カスタマイズ（開発者向け）
 すべてのリストは `app/GP247/Plugins/SandboxDemo/config.php` ファイルで宣言されています。ここを編集すればよく、コアのコードに触れる**必要はありません**。
