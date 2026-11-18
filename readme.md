@@ -1,44 +1,64 @@
 > 🌐 **Language:** [🇻🇳 Tiếng Việt](./readme_vi.md) · 🇬🇧 English (current) · [🇯🇵 日本語](./readme_ja.md)
 
-# SandboxDemo — Read-only admin demo mode for GP247 v3
+# SandboxDemo — Demo mode for GP247 v3: a working storefront, a view-only back office
 
 ## Introduction
-The **SandboxDemo** plugin turns the GP247 admin into a **safe demo**: visitors can **explore every feature** (browse, search, open forms, paginate) but **cannot change any data** — every Save/Delete/Edit is blocked with a "demo mode" notice. This document is for **site owners** who want to publish a public admin demo, and for **developers** who need to understand or customize the blocking mechanism. After reading it you will be able to turn demo mode on/off and know exactly which actions are blocked and which are allowed.
+The **SandboxDemo** plugin turns a GP247 website into a **demo that is safe to publish**:
+- **The storefront works for real.** Visitors can register, sign in, fill a cart, place orders and edit their own profile as usual.
+- **Everything else is view-only.** The admin panel, the admin REST API, MCP and the vendor/partner panels show every feature, but **cannot change any data**. Every Save/Delete/Edit is blocked with a "demo mode" notice.
+
+This guide is for **site owners** who want to publish a demo (usually with a public demo admin account) and for **developers** who need to understand or tune the blocking. After reading it you can switch demo mode on and off and know exactly what can write and what is blocked.
 
 ## 1. Plugin information
 - **Name**: SandboxDemo module
-- **Author**: GP247
-- **Core requirement**: `>= 2.1` (GP247 v3 — Laravel + Livewire)
+- **Developer**: GP247
+- **Requires Core**: GP247 v3 (Laravel + Livewire)
 - **Path**: `app/GP247/Plugins/SandboxDemo`
-- **Switch**: the `SANDBOX_DEMO_ENABLED` variable in the `.env` file
+- **Switch**: the `SANDBOX_DEMO_ENABLED` variable in `.env`
 
-## 2. How it works (in plain terms)
-GP247 v3 renders the admin UI with **Livewire** — every button (including Save and Delete) posts to one shared endpoint, so the old "block by request method" approach no longer works. SandboxDemo therefore blocks at **two layers**, independent of the UI:
+## 2. How it works (plain language)
+The rule is **deny by default: only the storefront may write**. Every request falls into one of these groups:
 
-- **Layer A — block database writes.** The plugin sits right in front of every statement sent to the database. **Read** statements (list views, search) always pass; **write** statements (add/edit/delete data) are blocked. Because it lives at the data layer, it catches every write path — whether it comes from Livewire, a legacy controller, or a direct query.
-- **Layer B — block destructive file operations.** The image/file manager has delete/rename/move/crop/new-folder operations that run as plain links (GET). Layer B blocks exactly those operations by name, while browsing/viewing files stays allowed.
+| Group | What it covers | While demo mode is on |
+|---|---|---|
+| **Storefront** | Storefront pages (register, sign in, cart, checkout, customer account…), the customer REST API (`api/front`, `api/v2/front`) | Writes normally |
+| **Back-office sign-in** | Admin and vendor sign-in / sign-out | Allowed, so visitors can enter the admin |
+| **Everything else** | Admin panel, admin REST API (every version), MCP, vendor/partner panels, any path not in the storefront list | **View-only**: writes are blocked whether the caller uses a session, a token or no login at all |
 
-So the system keeps working while "viewing" (login, session, cache), a few **infrastructure** tables are always allowed to be written (see Conditions & Rules).
+```mermaid
+flowchart LR
+    R[Request] --> Q{Storefront?}
+    Q -- Yes --> OK[Writes normally]
+    Q -- No --> A{Back-office sign-in / sign-out?}
+    A -- Yes --> OK
+    A -- No --> V[View-only: writes and file operations blocked]
+```
 
-## 3. Installation and enabling demo mode
-1. Make sure the source code is at `app/GP247/Plugins/SandboxDemo`.
-2. Go to the admin **Extensions** page, find the **SandboxDemo** plugin, and click **Install**.
+Blocking on "everything else" works in **two layers**:
+- **Layer A — database writes.** The plugin stands in front of every statement sent to the database. **Reads** always pass and **writes** are blocked. This catches every write path: Livewire, controllers, direct queries and token-based APIs.
+- **Layer B — stop the request on arrival.** Every request that is **not a view** (not GET) and a few dangerous GET links are stopped **before** they are processed. Examples: installing/removing/importing extensions, backup/restore, uploads, deleting/renaming files, downloading backups. File writes and code execution therefore never start.
+
+The plugin **does not rely on anything the browser declares about itself** (such as the Referer header) to decide whether a request belongs to the storefront. Instead it uses the route the server matched and Livewire data signed by the server. A visitor cannot "pretend" to be a storefront request.
+
+## 3. Install and enable demo mode
+1. Make sure the source sits at `app/GP247/Plugins/SandboxDemo`.
+2. In the admin, open **Extensions**, find **SandboxDemo**, click **Install**.
 3. After installing, click **Enable**.
-4. Open the `.env` file at the site root, add (or edit) exactly this line, and save:
+4. Open the `.env` file in the site root, add (or edit) exactly this line and save:
 
    ```
    SANDBOX_DEMO_ENABLED=1
    ```
 
-5. Clear the config cache so the change takes effect. Open a **Terminal** at the site root, type the following, and press Enter:
+5. Clear the configuration cache so the change takes effect. Open a **terminal** in the site root, type the line below and press Enter:
 
    ```
    php artisan optimize:clear
    ```
 
-   On success you will see a few `... DONE` lines. From now on, log into the admin and try **Save** on any screen — the system will report "Demo mode: changes to system data are disabled" and the data will **not** change.
+   On success the screen shows a few `... DONE` lines. From now on, sign in to the admin and press **Save** on any screen: the system replies "Demo mode: only the storefront can change data" and the data **does not change**. Go to the storefront and try registering and ordering: everything works as usual.
 
-**Disabling demo mode:** set `SANDBOX_DEMO_ENABLED=0` (or remove the line), then run `php artisan optimize:clear` again. Setting `=0` disables blocking **even if** the plugin is still Enabled in the admin.
+**Turn demo mode off:** set `SANDBOX_DEMO_ENABLED=0` (or remove the line) and run `php artisan optimize:clear` again. `=0` disables the blocking **even if** the plugin is still enabled in the admin.
 
 ### Install from the command line (CLI, gp247 3.x)
 
@@ -58,79 +78,91 @@ php artisan gp247:ext-install --type=plugin --key=SandboxDemo
 - If the folder `app/GP247/Plugins/SandboxDemo` is already on the server (copied manually or shipped with the installer), the command **installs it in place** instead of downloading it again.
 - The command refuses a plugin that is already installed. To move to a newer version, run `php artisan gp247:ext-update --type=plugin --key=SandboxDemo`.
 - Append `--json` to get machine-readable output (for scripts/CI).
-- The command replaces steps 1–3 above (placing the folder, **Install**, **Enable**). **After a CLI install, demo mode is still OFF**: you still need step 4 (add `SANDBOX_DEMO_ENABLED=1` to `.env`) and step 5 (`php artisan optimize:clear`) before writes are blocked.
+- The command replaces steps 1–3 above (placing the folder, **Install**, **Enable**). **After a CLI install, demo mode is still OFF**: you still need step 4 (add `SANDBOX_DEMO_ENABLED=1` to `.env`) and step 5 (`php artisan optimize:clear`) before the blocking takes effect.
+- `php artisan` commands (including a scheduled command that resets the demo data) are **not** blocked, because the site owner runs them on the server.
 - More: [Installing Plugins & Templates](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension.md) · [Command reference](https://github.com/gp247net/gp247-docs/blob/main/cli/cli-extensions.md).
 
-## 4. Customization (for developers)
-Every list is declared in `app/GP247/Plugins/SandboxDemo/config.php` — edit it there, **no** core code changes needed:
+## 4. Customisation (for developers)
+Every list lives in `app/GP247/Plugins/SandboxDemo/config.php`: edit it there, with **no need** to touch core code:
 
-- `infra_write_allowlist` — tables **always writable** while sandboxed (default: `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens`). If your site has another background-write table (e.g. a view counter or an audit log) that gets wrongly blocked on a view page, add its name (prefix stripped) here.
-- `lfm_destructive_routes` — the File Manager routes blocked while sandboxed. Add/remove as needed.
+| Key | Default | Use it when |
+|---|---|---|
+| `storefront_route_groups` | `front` | Route groups treated as storefront |
+| `storefront_path_prefixes` | `api/front`, `api/v2/front` | Paths of the customer REST API |
+| `storefront_route_names` | `shop.shipping.webhook` | Storefront routes outside the `front` group. **If a payment/shipping plugin has its own webhook or return page**, add its route name here so the demo can process test payments. |
+| `operator_auth_routes` | admin and vendor sign-in/sign-out | Sign-in routes that stay open. Password reset and vendor self-registration are **deliberately** left out. |
+| `blocked_get_routes` | destructive File Manager actions + backup download | GET links blocked even though they only "open a link" |
+| `infra_write_allowlist` | `sessions`, `cache`, `cache_locks` | Infrastructure tables still writable in view-only areas, so sessions keep working |
 
-## 5. Conditions & Rules (know before you act)
-Understand the rules so a blocking notice never surprises you:
+## 5. Conditions & constraints (read before you act)
+Know the rules so a block notice never surprises you.
 
 **When is demo mode in effect?**
-- **The switch must be on**: `SANDBOX_DEMO_ENABLED=1` in `.env` — if `=0` or missing, the plugin blocks nothing (even if Enabled in the admin).
-- **Someone must be logged in** as admin / PMO partner / vendor — so **logging in** and any pre-login pages keep working (never wrongly blocked).
-- **Only the admin and admin-API (`api/core`) surfaces are affected.** The entire **storefront** always works normally — even when an admin is logged in the same browser — including customer **account registration, login, add-to-cart, and checkout/order placement**. The customer REST API (`api/front/*`) is not blocked either. The admin prefixes are declared in `admin_surface_prefixes` (`config.php`); the site's admin prefix and any installed vendor/PMO backend prefixes are added automatically.
+- **The switch alone decides**: `SANDBOX_DEMO_ENABLED=1` in `.env`. With `=0` or no such line, the plugin blocks nothing (even if enabled in the admin).
+- Blocking **does not depend** on whether the caller is signed in, or how.
 
-**Which actions are blocked (while in effect)?**
-- **Every data write**: add, edit, delete records on any screen — because the goal is to keep the demo data intact.
-- **Destructive File Manager operations**: delete, rename, move, resize, crop, new folder, upload — even when they run as GET links.
-- **A write whose target table cannot be identified** is also blocked (fail-safe: better to block wrongly than to let one through).
+**What is blocked (while demo mode is on)?** Everything outside the storefront:
+- **Every data write** in the admin and in vendor/partner panels.
+- **The admin REST API and MCP are fully closed**, including token sign-in and reads. The demo account is public, so every token-based entrance has to be closed.
+- **Installing/removing/importing/updating/enabling/disabling extensions, backup/restore, downloading backups.** A backup holds customer data and hashed passwords; downloading it is not "viewing a feature".
+- **File Manager file operations**: delete, rename, move, resize, crop, new folder, upload.
+- **Uploading files in the back office** (images, data-import files…) and every action on the **backup screens**, which become view-only, including the connection test for off-site storage.
+- **Back-office password reset and vendor self-registration.**
+- **Writes whose target table cannot be determined** (safety first: better a false block than a leak).
 
-**Which actions are always allowed?**
-- **Every read action**: open lists, search, filter, paginate, open a view form — so the experience is not interrupted.
-- **Writes to infrastructure tables** (login session, cache, queue) — so you are not logged out mid-session and the system keeps running.
+**What is always allowed?**
+- **The whole storefront**: register, sign in, cart, checkout/order, edit profile/addresses, including through the customer REST API.
+- **Every view action** in the admin: open lists, search, filter, paginate, open forms.
+- **Sign-in / sign-out** of the admin and vendor panels.
+- **Commands run on the server** (`php artisan`, queue workers, the scheduler).
 
-**Out of scope (not blocked in this version):** effects that reach **outside the database** such as sending real emails, calling payment-gateway APIs, or webhooks are **not** blocked yet. For a public demo server, configure email/payment in the provider's test/sandbox mode to stay safe.
+**Out of scope:** effects **outside the database** triggered by **the storefront** are **not** blocked yet, such as order-confirmation emails or payment-gateway calls. On a public demo server, configure email and payment gateways in their test/sandbox mode.
 
 ## 6. Support
 - Website: `https://GP247.net`
 - Email: `support@gp247.net`
 
 ## Q&A
-**Q1: I enabled the plugin in the admin but nothing is being blocked — why?**
+**Q1: I enabled the plugin in the admin, why is nothing blocked?**
 
-→ The `.env` switch is missing. Add `SANDBOX_DEMO_ENABLED=1` to the `.env` file, run `php artisan optimize:clear`, then try again.
+→ The `.env` switch is missing. Add `SANDBOX_DEMO_ENABLED=1` to `.env`, run `php artisan optimize:clear`, then try again.
 
-**Q2: Will enabling demo mode log visitors out repeatedly?**
+**Q2: Can visitors register and buy on the demo site?**
 
-→ No. The session/cache tables are on the always-writable list, so the login session is kept normally while viewing.
+→ Yes. The whole storefront works for real: register, sign in, cart, order, edit profile, including through the customer REST API.
 
-**Q3: Can visitors paginate and search, or is everything blocked?**
+**Q3: Will visitors be signed out all the time?**
 
-→ Viewing, searching, filtering, and pagination are all allowed — only **data-changing** actions are blocked.
+→ No. Session and cache tables are still written, and admin sign-in/sign-out is always allowed.
 
-**Q4: Can visitors delete/edit images in the File Manager?**
+**Q4: Can visitors paginate and search in the admin?**
 
-→ No. Delete/rename/move/crop/new-folder/upload are all blocked, even when they run as GET links. Only browsing/viewing files is allowed.
+→ Yes. Viewing, searching, filtering and paginating are allowed; only actions that **change data** are blocked.
 
-**Q5: What do visitors see when an action is blocked?**
+**Q5: Why are the admin REST API and MCP unavailable in demo mode?**
 
-→ A short notice, "Demo mode: changes to system data are disabled" (as a floating toast on the Livewire admin), not a raw error page.
+→ The demo account is public, so anyone could obtain a token. To leave no way around the blocking, both entrances are closed while demo mode is on, reads included. The customer REST API keeps working.
 
-**Q6: A view-only page is wrongly blocked — how do I fix it?**
+**Q6: Can someone get around it by sending requests by hand (devtools, curl)?**
 
-→ That page probably writes to a background table (view counter, audit log). Add that table name to `infra_write_allowlist` in `config.php`, then clear the cache.
+→ No. The plugin blocks whatever the caller's login. It also never trusts what the browser declares: Livewire requests are recognised from data signed by the server, not from the Referer header.
 
-**Q7: Does demo mode block sending real emails or payments?**
+**Q7: A test payment on the demo does not update the order status. What do I do?**
 
-→ The current version does **not** block effects outside the database (email, payment gateway, webhooks). Configure those in test mode for the demo server.
+→ The payment plugin's webhook or return page is probably outside the storefront route group. Add that route name to `storefront_route_names` in `config.php`, then run `php artisan optimize:clear`.
 
-**Q8: How do I quickly turn demo mode off?**
+**Q8: What does a visitor see when something is blocked?**
 
-→ Set `SANDBOX_DEMO_ENABLED=0` in `.env` (or remove the line), then run `php artisan optimize:clear`. This turns it off even while the plugin is still Enabled.
+→ A short notice "Demo mode: only the storefront can change data". On Livewire admin screens it is a toast; on the API it is a JSON `{error:1, msg}` with status 403.
 
-**Q9: Why not reuse the old approach (block by request method)?**
+**Q9: How do I switch demo mode off quickly?**
 
-→ On GP247 v3, every admin action goes through one shared Livewire endpoint, so blocking by request method can no longer see the write. That is why the new version blocks at the database layer and the file-operation layer.
+→ Set `SANDBOX_DEMO_ENABLED=0` in `.env` (or remove the line) and run `php artisan optimize:clear`. This works even while the plugin is enabled.
 
-**Q10: Does the plugin change any of my data or structure?**
+**Q10: Does the plugin change my data or schema?**
 
-→ No. The plugin only **blocks** while demo mode is on; it adds no tables and changes none of your business data.
+→ No. It only **blocks** while demo mode is on; it adds no tables and changes none of your business data.
 
 ---
 
-<sub>📅 **Last updated:** 2026-10-22 · ✍️ **Author:** GP247</sub>
+<sub>📅 **Last updated:** 2026-11-18 · ✍️ **Author:** GP247</sub>

@@ -29,10 +29,27 @@ class SandboxWriteBlockedException extends RuntimeException
     }
 
     /**
+     * Report hook: a blocked demo action is expected behaviour, not an application error.
+     *
+     * WHY return true: Laravel treats a report() result other than false as "handled", so
+     * nothing is written to the log. Without it every blocked click — which any visitor can
+     * repeat at will — would append a full stack trace to laravel.log.
+     *
+     * @return bool Always true (handled, do not log).
+     *
+     * @aidlc-unit sandbox-demo-plugin
+     * @aidlc-story US-sandbox-demo-block-db-writes
+     */
+    public function report(): bool
+    {
+        return true;
+    }
+
+    /**
      * Render the exception as an HTTP response.
      *
      * @param Request $request Current request.
-     * @return \Symfony\Component\HttpFoundation\Response Tagged JSON for Livewire (friendly toast), plain JSON for other AJAX, plain 403 body otherwise.
+     * @return \Symfony\Component\HttpFoundation\Response Tagged JSON for Livewire (friendly toast), plain JSON for other AJAX and any api/* caller, plain 403 body otherwise.
      *
      * @aidlc-unit sandbox-demo-plugin
      * @aidlc-story US-sandbox-demo-block-db-writes
@@ -54,8 +71,10 @@ class SandboxWriteBlockedException extends RuntimeException
         }
 
         // Non-Livewire AJAX callers (e.g. jQuery endpoints) keep the plugin's
-        // conventional {error, msg} envelope.
-        if ($request->ajax() || $request->wantsJson()) {
+        // conventional {error, msg} envelope. WHY is('api/*'): the route guard stops API
+        // and MCP calls before ForceJsonResponse runs, so a client that sent no Accept
+        // header must still get JSON rather than an HTML/plain body.
+        if ($request->ajax() || $request->wantsJson() || $request->is('api/*')) {
             return response()->json(['error' => 1, 'msg' => $message], 403);
         }
 

@@ -4,7 +4,6 @@
 namespace App\GP247\Plugins\SandboxDemo\Support;
 
 use App\GP247\Plugins\SandboxDemo\Exceptions\SandboxWriteBlockedException;
-use Illuminate\Http\Request;
 
 /**
  * Core of the sandbox write-guard (ADR sandbox-demo_write-guard-layer, Layer A).
@@ -15,15 +14,15 @@ use Illuminate\Http\Request;
  * decision is made on the SQL text only — no extra query is issued — so it is
  * transport-agnostic (Livewire, controller, or query-builder) and cheap.
  *
- * Scope is limited to the admin + admin-API surfaces: the DB hook is global and also
- * fires on storefront requests, so the guard must confirm the current request is an
- * admin one (by path prefix, or the host page's Referer for a Livewire update) before
- * enforcing — otherwise a storefront page that writes (e.g. a view counter) would be
- * blocked whenever an admin happens to be logged in the same browser.
+ * Scope is deny-by-default (ADR sandbox-demo_storefront-allowlist): the DB hook is
+ * global, and a write is guarded whenever the current request is not on the storefront
+ * (SandboxSurface), whoever the caller is — session, token or nobody. The storefront,
+ * operator sign-in/out and console/queue keep writing.
  *
  * @aidlc-unit sandbox-demo-plugin
  * @aidlc-story US-sandbox-demo-block-db-writes
  * @aidlc-adr sandbox-demo_write-guard-layer
+ * @aidlc-adr sandbox-demo_storefront-allowlist
  */
 class SandboxGuard
 {
@@ -32,91 +31,29 @@ class SandboxGuard
         'insert', 'update', 'delete', 'replace', 'truncate', 'drop', 'alter', 'create', 'rename', 'merge',
     ];
 
-    /** Read/scan verbs — always allowed. */
-    private const READ_VERBS = ['select', 'show', 'explain', 'describe', 'desc', 'with', 'call'];
+    /** Read/scan verbs — allowed unless the statement body writes (see classify()). */
+    private const READ_VERBS = ['select', 'show', 'explain', 'describe', 'desc', 'with'];
+
+    /** Transaction / session control verbs — never change data. */
+    private const CONTROL_VERBS = ['set', 'start', 'begin', 'commit', 'rollback', 'savepoint', 'release', 'use', 'pragma', 'unlock'];
 
     /**
-     * Re-entrancy flag: resolving the authenticated operator issues its own SELECTs,
-     * which re-enter beforeExecuting; skip the guard while already inspecting.
+     * Re-entrancy flag: anything resolved while inspecting (config, translations) must not
+     * re-enter the guard if it ever issues SQL; skip the guard while already inspecting.
      */
     private static bool $inspecting = false;
 
-    /** Optional operator resolver seam (tests / hosts); null uses the default guards. */
-    private static $operatorResolver = null;
-
     /**
-     * Override how the guard decides an operator is logged in.
+     * Whether demo mode is switched on.
      *
-     * @param callable|null $resolver Returns true when an admin/pmo/vendor is present; null restores default.
-     * @return void
+     * @return bool True when the sandbox enforces on restricted surfaces.
      *
      * @aidlc-unit sandbox-demo-plugin
      * @aidlc-story US-sandbox-demo-block-db-writes
      */
-    public static function resolveOperatorUsing(?callable $resolver): void
-    {
-        self::$operatorResolver = $resolver;
-    }
-
-    /**
-     * Whether the sandbox is currently enforcing (switch on AND an operator logged in).
-     *
-     * @return bool True when writes must be guarded.
-     *
-     * @aidlc-unit sandbox-demo-plugin
-     * @aidlc-story US-sandbox-demo-keep-infra
-     */
     public static function isActive(): bool
     {
-        // WHY: check the cheap config switch first so normal sites (demo off) pay
-        // nothing beyond one array lookup per query.
-        if (!config('Plugins/SandboxDemo.SANDBOX_DEMO_ENABLED')) {
-            return false;
-        }
-
-        // WHY: the sandbox only governs the admin + admin-API surfaces. Everything
-        // else (storefront, console, queue) must keep working, so a global DB write
-        // is only guarded when it belongs to an admin request.
-        if (!self::isAdminSurface(request())) {
-            return false;
-        }
-
-        return self::hasAuthenticatedOperator();
-    }
-
-    /**
-     * Whether the given request targets an admin or admin-API surface.
-     *
-     * Matches the request path against the configured admin prefixes; a Livewire
-     * update posts to the framework endpoint (web group) rather than an admin path,
-     * so its host page is read from the Referer header instead.
-     *
-     * @param Request|null $request Current request, or null in a context without one.
-     * @return bool True when the request belongs to an admin/admin-API surface.
-     *
-     * @aidlc-unit sandbox-demo-plugin
-     * @aidlc-story US-sandbox-demo-scope-admin-only
-     */
-    public static function isAdminSurface(?Request $request): bool
-    {
-        if ($request === null) {
-            return false;
-        }
-
-        $prefixes = self::adminSurfacePrefixes();
-
-        if (self::pathHasPrefix(ltrim($request->path(), '/'), $prefixes)) {
-            return true;
-        }
-
-        // WHY: Livewire posts every component update to its own endpoint (web group),
-        // so the request path is never an admin one — fall back to the host page in
-        // the Referer to tell an admin component from a storefront one.
-        if ($request->hasHeader('X-Livewire')) {
-            return self::pathHasPrefix(self::refererPath($request), $prefixes);
-        }
-
-        return false;
+        return (bool) config('Plugins/SandboxDemo.SANDBOX_DEMO_ENABLED');
     }
 
     /**
@@ -128,6 +65,7 @@ class SandboxGuard
      *
      * @aidlc-unit sandbox-demo-plugin
      * @aidlc-story US-sandbox-demo-block-db-writes
+     * @aidlc-story US-sandbox-demo-allow-storefront-only
      */
     public static function inspect(string $query): void
     {
@@ -137,7 +75,11 @@ class SandboxGuard
 
         self::$inspecting = true;
         try {
+            // WHY switch first: normal sites (demo off) pay one config lookup per query.
             if (!self::isActive()) {
+                return;
+            }
+            if (SandboxSurface::classify(request()) !== SandboxSurface::RESTRICTED) {
                 return;
             }
             if (self::wouldBlock($query)) {
@@ -178,7 +120,7 @@ class SandboxGuard
      * Classify a statement by its leading verb.
      *
      * @param string $query Raw SQL statement.
-     * @return string One of "write", "read", "control" (control = unknown/transaction/session verbs, always allowed).
+     * @return string One of "write", "read", "control" (control = transaction/session verbs, always allowed).
      *
      * @aidlc-unit sandbox-demo-plugin
      * @aidlc-story US-sandbox-demo-keep-view
@@ -193,12 +135,42 @@ class SandboxGuard
             return 'write';
         }
         if (in_array($verb, self::READ_VERBS, true)) {
+            // WHY: a CTE can end in a data change (WITH … UPDATE/DELETE on MySQL 8), and
+            // SELECT … INTO OUTFILE/DUMPFILE writes a file on the database server.
+            if ($verb === 'with' && preg_match('/\b(insert|update|delete|replace)\b/i', $query)) {
+                return 'write';
+            }
+            if ($verb === 'select' && preg_match('/\binto\s+(outfile|dumpfile)\b/i', $query)) {
+                return 'write';
+            }
+
             return 'read';
         }
+        if (in_array($verb, self::CONTROL_VERBS, true)) {
+            return 'control';
+        }
 
-        // WHY: unknown verbs (set/commit/use/lock/analyze…) are not data writes we
-        // target; allow them so reads and transaction control never break viewing.
-        return 'control';
+        // WHY fail-safe: an unknown verb (call, load, do, handler, lock, grant, optimize…)
+        // may change data; treating it as a write means a new verb is blocked, not leaked.
+        return 'write';
+    }
+
+    /**
+     * Queue listener: refuse to enqueue a job from a restricted surface, because the worker
+     * that runs it later has no HTTP route and is never guarded.
+     *
+     * @param object $event Illuminate\Queue\Events\JobQueueing.
+     * @return void
+     * @throws SandboxWriteBlockedException When a restricted request tries to queue work.
+     *
+     * @aidlc-unit sandbox-demo-plugin
+     * @aidlc-story US-sandbox-demo-keep-infra
+     */
+    public static function guardQueueing(object $event): void
+    {
+        if (self::isActive() && SandboxSurface::classify(request()) === SandboxSurface::RESTRICTED) {
+            throw new SandboxWriteBlockedException();
+        }
     }
 
     /**
@@ -231,23 +203,7 @@ class SandboxGuard
     }
 
     /**
-     * Whether an admin, PMO partner, or vendor is logged in.
-     *
-     * @return bool True when at least one operator guard has a user.
-     */
-    private static function hasAuthenticatedOperator(): bool
-    {
-        if (self::$operatorResolver !== null) {
-            return (bool) call_user_func(self::$operatorResolver);
-        }
-
-        return (function_exists('admin') && admin()->user())
-            || (function_exists('pmo_partner') && pmo_partner()->user())
-            || (function_exists('vendor') && vendor()->user());
-    }
-
-    /**
-     * First SQL keyword, lowercased, skipping leading block comments and parentheses.
+     * First SQL keyword, lowercased, skipping leading comments and parentheses.
      *
      * @param string $query Raw SQL statement.
      * @return string|null Leading verb, or null when none found.
@@ -256,13 +212,25 @@ class SandboxGuard
     {
         $sql = ltrim($query);
 
-        // Strip leading block comments Laravel/drivers may prepend.
-        while (strncmp($sql, '/*', 2) === 0) {
-            $end = strpos($sql, '*/');
-            if ($end === false) {
-                break;
+        // Strip leading comments (block, "-- " and "#" line comments) drivers or callers prepend.
+        while (true) {
+            if (strncmp($sql, '/*', 2) === 0) {
+                $end = strpos($sql, '*/');
+                if ($end === false) {
+                    return null;
+                }
+                $sql = ltrim(substr($sql, $end + 2));
+                continue;
             }
-            $sql = ltrim(substr($sql, $end + 2));
+            if (strncmp($sql, '--', 2) === 0 || strncmp($sql, '#', 1) === 0) {
+                $end = strpos($sql, "\n");
+                if ($end === false) {
+                    return null;
+                }
+                $sql = ltrim(substr($sql, $end + 1));
+                continue;
+            }
+            break;
         }
 
         $sql = ltrim($sql, "( \t\n\r");
@@ -297,80 +265,5 @@ class SandboxGuard
     private static function allowlist(): array
     {
         return (array) config('Plugins/SandboxDemo.infra_write_allowlist', []);
-    }
-
-    /**
-     * Whether a request/referer path starts with one of the admin surface prefixes.
-     *
-     * @param string   $path     Path with no leading slash (e.g. "gp247_admin/product").
-     * @param string[] $prefixes Admin surface prefixes (e.g. ["gp247_admin", "api"]).
-     * @return bool True when the path is exactly a prefix or sits under one.
-     */
-    private static function pathHasPrefix(string $path, array $prefixes): bool
-    {
-        foreach ($prefixes as $prefix) {
-            if ($prefix === '') {
-                continue;
-            }
-            if ($path === $prefix || strncmp($path, $prefix . '/', strlen($prefix) + 1) === 0) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Path portion of the request's Referer header, without a leading slash.
-     *
-     * @param Request $request Current request.
-     * @return string Referer path (e.g. "gp247_admin/discount"), or "" when absent.
-     */
-    private static function refererPath(Request $request): string
-    {
-        $referer = (string) $request->headers->get('referer', '');
-        if ($referer === '') {
-            return '';
-        }
-
-        return ltrim((string) parse_url($referer, PHP_URL_PATH), '/');
-    }
-
-    /**
-     * Admin surface path prefixes: the configured list plus the live admin prefix
-     * constant and any installed vendor/partner backend prefixes.
-     *
-     * @return string[] Prefixes without a leading slash.
-     */
-    private static function adminSurfacePrefixes(): array
-    {
-        $prefixes = (array) config('Plugins/SandboxDemo.admin_surface_prefixes', []);
-
-        if (defined('GP247_ADMIN_PREFIX')) {
-            $prefixes[] = GP247_ADMIN_PREFIX;
-        }
-
-        // Optional sibling backends (multi-vendor, PMO partner) declare their own
-        // admin path; include them when those extensions are installed.
-        // WHY both MultiVendor keys: the plugin was renamed from MultiVendorPro and its
-        // config moved to Plugins/MultiVendor. Reading only the old key left
-        // /vendor_admin unguarded — a demo vendor could save everything. The old key
-        // stays for sites still running the pre-rename plugin.
-        $backendPathKeys = [
-            'Plugins/MultiVendor.route.MULTIVENDOR_ADMIN_PATH',
-            'Plugins/MultiVendorPro.route.MULTIVENDOR_ADMIN_PATH',
-            'Plugins/PmoPartner.route.PARTNER_ADMIN_PATH',
-        ];
-        foreach ($backendPathKeys as $configKey) {
-            $value = config($configKey);
-            if (is_string($value) && $value !== '') {
-                $prefixes[] = $value;
-            }
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            static fn ($prefix): string => ltrim((string) $prefix, '/'),
-            $prefixes
-        ))));
     }
 }

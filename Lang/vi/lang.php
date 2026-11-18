@@ -4,6 +4,5 @@ return [
     'admin'      => [
         'title'          => 'SandboxDemo',
     ],
-    'write_blocked' => 'Chế độ demo: không thể thay đổi dữ liệu hệ thống.',
-    'lfm_blocked'   => 'Chế độ demo: không thể thay đổi tệp/ảnh.',
+    'write_blocked' => 'Chế độ demo: chỉ phía cửa hàng được thay đổi dữ liệu; khu quản trị chỉ để xem.',
 ];
