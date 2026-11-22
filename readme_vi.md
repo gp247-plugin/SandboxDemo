@@ -1,9 +1,9 @@
 > 🌐 **Ngôn ngữ:** 🇻🇳 Tiếng Việt (hiện tại) · [🇬🇧 English](./readme.md) · [🇯🇵 日本語](./readme_ja.md)
 
-# SandboxDemo — Chế độ demo cho GP247 v3: cửa hàng dùng thật, quản trị chỉ xem
+# SandboxDemo — Chế độ demo cho S-Cart 3.x: cửa hàng dùng thật, quản trị chỉ xem
 
 ## Giới thiệu
-Plugin **SandboxDemo** biến website GP247 thành một **bản demo an toàn để công khai**:
+Plugin **SandboxDemo** biến website S-Cart thành một **bản demo an toàn để công khai**:
 - **Phía cửa hàng dùng thật.** Khách đăng ký thành viên, đăng nhập, thêm giỏ hàng, đặt hàng, sửa hồ sơ của mình bình thường.
 - **Mọi chỗ khác chỉ xem.** Trang quản trị, REST API quản trị, MCP và trang của vendor/đối tác cho xem mọi tính năng, nhưng **không thể thay đổi dữ liệu**. Mọi thao tác Lưu/Xoá/Sửa bị chặn và hiện thông báo "chế độ demo".
 

@@ -1,9 +1,9 @@
 > 🌐 **Language:** [🇻🇳 Tiếng Việt](./readme_vi.md) · 🇬🇧 English (current) · [🇯🇵 日本語](./readme_ja.md)
 
-# SandboxDemo — Demo mode for GP247 v3: a working storefront, a view-only back office
+# SandboxDemo — Demo mode for S-Cart 3.x: a working storefront, a view-only back office
 
 ## Introduction
-The **SandboxDemo** plugin turns a GP247 website into a **demo that is safe to publish**:
+The **SandboxDemo** plugin turns an S-Cart website into a **demo that is safe to publish**:
 - **The storefront works for real.** Visitors can register, sign in, fill a cart, place orders and edit their own profile as usual.
 - **Everything else is view-only.** The admin panel, the admin REST API, MCP and the vendor/partner panels show every feature, but **cannot change any data**. Every Save/Delete/Edit is blocked with a "demo mode" notice.
 
