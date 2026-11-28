@@ -80,7 +80,7 @@ php artisan gp247:ext-install --type=plugin --key=SandboxDemo
 - Append `--json` to get machine-readable output (for scripts/CI).
 - The command replaces steps 1–3 above (placing the folder, **Install**, **Enable**). **After a CLI install, demo mode is still OFF**: you still need step 4 (add `SANDBOX_DEMO_ENABLED=1` to `.env`) and step 5 (`php artisan optimize:clear`) before the blocking takes effect.
 - `php artisan` commands (including a scheduled command that resets the demo data) are **not** blocked, because the site owner runs them on the server.
-- More: [Installing Plugins & Templates](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension.md) · [Command reference](https://github.com/gp247net/gp247-docs/blob/main/cli/cli-extensions.md).
+- More: [Installing Plugins & Templates](https://github.com/gp247-official/gp247-docs/blob/main/extension/install-extension.md) · [Command reference](https://github.com/gp247-official/gp247-docs/blob/main/cli/cli-extensions.md).
 
 ## 4. Customisation (for developers)
 Every list lives in `app/GP247/Plugins/SandboxDemo/config.php`: edit it there, with **no need** to touch core code:

@@ -80,7 +80,7 @@ php artisan gp247:ext-install --type=plugin --key=SandboxDemo
 - コマンドの末尾に `--json` を付けると、機械で読める形式の結果を受け取れます（スクリプト / CI 用）。
 - このコマンドは上記の手順1〜3（フォルダーの配置、「**Install**」、「**Enable**」）の代わりになります。**CLI でインストールした直後は、デモモードはまだオフです**：ブロックを有効にするには、手順4（`.env` に `SANDBOX_DEMO_ENABLED=1` を追加）と手順5（`php artisan optimize:clear`）を行う必要があります。
 - `php artisan` コマンド（デモデータをリセットする定期実行コマンドを含む）は、サイト運営者がサーバー上で実行するものなので、ブロック**されません**。
-- 詳細：[プラグインとテンプレートのインストールガイド](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension.md) · [コマンドリファレンス](https://github.com/gp247net/gp247-docs/blob/main/cli/cli-extensions_ja.md)。
+- 詳細：[プラグインとテンプレートのインストールガイド](https://github.com/gp247-official/gp247-docs/blob/main/extension/install-extension.md) · [コマンドリファレンス](https://github.com/gp247-official/gp247-docs/blob/main/cli/cli-extensions_ja.md)。
 
 ## 4. カスタマイズ（開発者向け）
 すべての一覧は `app/GP247/Plugins/SandboxDemo/config.php` にあります。ここを編集すればよく、コアのコードに触れる**必要はありません**。

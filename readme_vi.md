@@ -80,7 +80,7 @@ php artisan gp247:ext-install --type=plugin --key=SandboxDemo
 - Thêm `--json` vào cuối lệnh để nhận kết quả dạng máy đọc được (dùng cho script/CI).
 - Lệnh thay cho các bước 1–3 ở trên (đặt thư mục, **Install**, **Enable**). **Cài xong bằng CLI, chế độ demo vẫn đang TẮT**: bạn vẫn phải làm bước 4 (thêm `SANDBOX_DEMO_ENABLED=1` vào `.env`) và bước 5 (`php artisan optimize:clear`) thì việc chặn mới có hiệu lực.
 - Các lệnh `php artisan` (kể cả lệnh làm mới dữ liệu demo chạy theo lịch) **không** bị chặn, vì chúng do chủ site chạy trên máy chủ.
-- Chi tiết: [Hướng dẫn cài đặt Plugin & Template](https://github.com/gp247net/gp247-docs/blob/main/extension/install-extension_vi.md) · [Tra cứu lệnh](https://github.com/gp247net/gp247-docs/blob/main/cli/cli-extensions_vi.md).
+- Chi tiết: [Hướng dẫn cài đặt Plugin & Template](https://github.com/gp247-official/gp247-docs/blob/main/extension/install-extension_vi.md) · [Tra cứu lệnh](https://github.com/gp247-official/gp247-docs/blob/main/cli/cli-extensions_vi.md).
 
 ## 4. Tuỳ chỉnh (dành cho lập trình viên)
 Mọi danh sách đều khai trong file `app/GP247/Plugins/SandboxDemo/config.php`, sửa ở đây, **không cần** đụng vào mã lõi:
